@@ -26,7 +26,7 @@ These are the working documents behind the short answers in [`TASKS_02-04.md`](.
 | [`fix_backlog.md`](fix_backlog.md) | **Task 2, item 3 and task 4.** Full detail behind `TASKS_02-04.md`: owner of each fix (account team / product team / Voltika) with P0–P2 priorities, the order of work, the SMS phases, and the switch-off summary. | the task documents it links to |
 | [`task4_switch_off.md`](task4_switch_off.md) | **Task 4, item 3.** Operator capacity against demand per hour, three scenarios, the OMS degradation window, and what would change the verdict. | `scripts/task4_capacity.py` |
 | [`outage_consistency_evidence.md`](outage_consistency_evidence.md) | **Evidence for a human check.** `get_outage` gives contradictory answers for the same address. The document tests and rejects the legitimate explanations, then compares the answers with a random baseline. Its conclusion: the inconsistency is real in the data but may be an artefact of the fictional dataset. | `scripts/check_outage_consistency.py` |
-| [`night2_network_drop.md`](night2_network_drop.md) | **Night 2 (in Russian).** The 75 calls cut by the network right after the first failed address attempt: the scenario, why they are `ADDRESS_NOT_UNDERSTOOD` today (spec 4.3, B1), why `ENDED_EARLY` fits better, and the decision N1 (applied in spec ed. 7). | `scripts/night2_network_drops.py` |
+| [`night2_network_drop.md`](night2_network_drop.md) | **Night 2.** The 75 calls cut by the network right after the first failed address attempt: the scenario, why they are `ADDRESS_NOT_UNDERSTOOD` today (spec 4.3, B1), why `ENDED_EARLY` fits better, and the decision N1 (applied in spec ed. 7). | `scripts/night2_network_drops.py` |
 
 ## Not committed: transcript dumps
 

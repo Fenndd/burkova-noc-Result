@@ -1,22 +1,22 @@
-# Ночь 2: обрыв связи после первой неудачной попытки адреса — 75 звонков
+# Night 2: network drop after the first failed address attempt — 75 calls
 
-Все числа: `python scripts/night2_network_drops.py` (ночь 2, 4000 звонков, флоу v15; для сравнения читает и ночь 1 из `data/`).
-Звонки в читаемом виде: [calls_network_drop_night2.md](calls_network_drop_night2.md). Этот файл в git не попадает, в нём данные задания. Он генерируется той же командой.
+All numbers: `python scripts/night2_network_drops.py` (night 2, 4,000 calls, flow v15; for comparison it also reads night 1 from `data/`).
+The calls in readable form: [calls_network_drop_night2.md](calls_network_drop_night2.md). That file is not committed because it contains the assignment's call data. The same command generates it.
 
-## Коротко
+## Summary
 
-На ночи 2 появилось новое значение `hangup.by = network`: звонок оборвала сеть. Таких звонков 150, и делятся они на две равные группы по 75.
+Night 2 brought a new value `hangup.by = network`: the network cut the call. There are 150 such calls, split into two equal groups of 75.
 
-| Группа | Что произошло | Лейбл сейчас | Лейбл, который точнее |
+| Group | What happened | Label before N1 | Better-fitting label |
 |---|---|---|---|
-| **A** | Резолвер не нашёл адрес с первой попытки (`no_match`). Бот попросил повторить, и пока звонящий отвечал, оборвалась связь | `ADDRESS_NOT_UNDERSTOOD` | **`ENDED_EARLY`** |
-| B | Резолвер нашёл адрес, звонящий подтвердил его («áno», «správne»), и сразу оборвалась связь | `ENDED_EARLY` | `ENDED_EARLY`, не оспаривается |
+| **A** | The resolver did not find the address on the first attempt (`no_match`). The bot asked the caller to repeat it, and the connection dropped while the caller was answering | `ADDRESS_NOT_UNDERSTOOD` | **`ENDED_EARLY`** |
+| B | The resolver found the address, the caller confirmed it ("áno", "správne"), and the connection dropped right after | `ENDED_EARLY` | `ENDED_EARLY`, not contested |
 
-Спорна только группа A. Ошибки в коде здесь нет: классификатор делает ровно то, что записано в спецификации (§4.3, решение B1). Вопрос в том, подходит ли само правило к новому сценарию «связь оборвалась».
+Only group A was contested. There was no bug in the code: the classifier did exactly what the specification said (§4.3, decision B1). The question was whether that rule fits the new scenario "the connection dropped".
 
-## Сценарий группы A
+## The group A scenario
 
-Все 75 звонков устроены одинаково. Пример `c-n2-000045`:
+All 75 calls look the same. Example `c-n2-000045`:
 
 ```text
    0.0  BOT      Dobrý večer, tu je Voltika, linka pre poruchy. Na akej adrese vám nejde prúd?
@@ -27,14 +27,14 @@
   15.0  HANGUP   by network
 ```
 
-Что общего у всех 75:
-- ровно одна попытка `resolve_address`, во всех 75 случаях статус `no_match`;
-- `get_outage` не вызывался;
-- последнее событие перед обрывом — реплика бота «Tú adresu nemôžem nájsť. Skúste mi ju povedať ešte raz, aj s názvom obce.», одна и та же во всех 75 звонках;
-- обрыв происходит через 5,7–8,2 с после неё (медиана 6,9 с), то есть пока звонящий, скорее всего, повторял адрес;
-- средний `asr_conf` первой реплики 0,53, распознавание плохое. В адресах видны разорванные слова: «sv ätý jur», «záhr adná», «hviezdo slavova».
+What all 75 have in common:
+- exactly one `resolve_address` attempt, with status `no_match` in all 75;
+- `get_outage` was never called;
+- the last event before the drop is the bot line "Tú adresu nemôžem nájsť. Skúste mi ju povedať ešte raz, aj s názvom obce.", identical in all 75 calls;
+- the drop comes 5.7–8.2 s after that line (median 6.9 s), most likely while the caller was repeating the address;
+- the mean `asr_conf` of the first utterance is 0.53, so recognition was poor. The addresses contain split words: "sv ätý jur", "záhr adná", "hviezdo slavova".
 
-Для сравнения парный звонок из группы B, `c-n2-000012`:
+For comparison, a twin call from group B, `c-n2-000012`:
 
 ```text
   11.4  BOT      Rozumiem, Hviezdoslavova 22, Pezinok. Sedí to?
@@ -42,65 +42,65 @@
   17.1  HANGUP   by network
 ```
 
-## Что выдаёт классификатор и почему
+## What the classifier returned before N1, and why
 
-Звонок проходит шаги спецификации так:
-1. Перевода (`transfer`) нет.
-2. Нет ни одного эпизода с исходом: нет тикета, нет сообщённого статуса, нет `route`.
-3. §4.3, последний сбой, который так и не исправили: был `resolve_address`, `get_outage` не вызывался, и была неудачная попытка. Значит, **`ADDRESS_NOT_UNDERSTOOD`**.
+The call went through the specification steps like this:
+1. No `transfer`.
+2. No outcome episode: no ticket, no reported status, no `route`.
+3. §4.3, the last uncorrected failure: there was a `resolve_address`, `get_outage` was not called, and there was a failed attempt. Result: **`ADDRESS_NOT_UNDERSTOOD`**.
 
-Это условие в коде: [classify.py:318](../classify.py:318). Для этого лейбла достаточно одного из трёх: неудачная попытка, ≥ 2 попыток или звонок закончил бот/`system`. Одной неудачной попытки хватает при любом `hangup.by`.
+In the code this was the ADDRESS condition in `classify_events` in [classify.py](../classify.py). Any one of three things was enough for the label: a failed attempt, ≥ 2 attempts, or the call ended by the bot/`system`. A single failed attempt was enough whatever the value of `hangup.by`.
 
-Основание — решение **B1** из [contested_cases.md](contested_cases.md): «после `no_match`/`ambiguous` положил трубку **звонящий** (бот ещё не сдался) → `ADDRESS_NOT_UNDERSTOOD`». Довод там был такой: сбой адреса был, человек ушёл без помощи, а `ENDED_EARLY` по README ставится, только когда сбоя инструмента не было.
+The basis was decision **B1** in [contested_cases.md](contested_cases.md): "after `no_match`/`ambiguous` the **caller** hung up (the bot had not given up yet) → `ADDRESS_NOT_UNDERSTOOD`". Its reasoning: there was an address failure, the person left without help, and per the README `ENDED_EARLY` applies only when no tool failed.
 
-## Почему точнее `ENDED_EARLY`
+## Why `ENDED_EARLY` fits better
 
-1. **Бот не сдался.** По прецедентам `ADDRESS_NOT_UNDERSTOOD` — это когда бот так и не установил адрес и сдался. На ночи 2 под этот лейбл попадают ещё 240 звонков. Все 240 заканчивает бот (`hangup.by = bot`) после 2–3 попыток, и последняя реплика у всех одна: «Mrzí ma to, adresu sa mi nepodarilo overiť…». В группе A этой фразы нет ни разу: бот только что попросил повторить адрес, и разговор оборвался.
+1. **The bot had not given up.** By the precedents, `ADDRESS_NOT_UNDERSTOOD` means the bot never established the address and gave up. On night 2, 240 other calls have this label. The bot ends all 240 (`hangup.by = bot`) after 2–3 attempts, and the last line is the same in every one: "Mrzí ma to, adresu sa mi nepodarilo overiť…". That line never appears in group A: the bot had just asked for the address again when the call dropped.
 
-2. **Повтор чаще всего помогает.** На ночи 2 есть 300 звонков, где первая попытка тоже не удалась, но связь держалась. В 180 из них (60 %) адрес нашёлся на одной из следующих попыток, и все эти 180 звонков — `KNOWN_OUTAGE_INFORMED`. Поэтому нельзя сказать, что бот «не понял адрес»: в большинстве похожих случаев он его понимает со второй-третьей попытки. Распознавание в этих 300 звонках такое же плохое (средний `asr_conf` 0,58 против 0,53 в группе A), так что группа A не выделяется особенно трудными адресами.
+2. **A retry usually works.** Night 2 has 300 calls where the first attempt also failed but the connection held. In 180 of them (60 %) the address was found on a later attempt, and all 180 are `KNOWN_OUTAGE_INFORMED`. So we cannot say the bot "did not understand the address": in most similar cases it understands it on the second or third attempt. Recognition in those 300 calls is just as poor (mean `asr_conf` 0.58 vs. 0.53 in group A), so group A does not stand out as having especially hard addresses.
 
-3. **Одинаковый сценарий получает разные лейблы.** В обеих группах связь оборвалась посреди диалога, пока бот ждал ответа звонящего. В группе B лейбл `ENDED_EARLY`, в группе A — `ADDRESS_NOT_UNDERSTOOD`. Разница только в статусе предыдущего инструмента. Деление 75 / 75 выглядит как намеренно заложенная проверка, что метка зависит от того, как закончился звонок, а не от того, на каком шаге оборвалась связь. Это моя догадка, проверить её можно только по лидерборду.
+3. **The same scenario got different labels.** In both groups the connection dropped mid-dialogue while the bot was waiting for the caller. Group B got `ENDED_EARLY`, group A `ADDRESS_NOT_UNDERSTOOD`. The only difference was the status of the previous tool call. The 75 / 75 split looks like a deliberate check that the label depends on how the call ended, not on the step at which the connection dropped. This is my guess; only the leaderboard can confirm it.
 
-4. **B1 писали про звонящего, а не про сеть.** Решение B1 сформулировано явно: трубку положил **звонящий**. Сеть в нём не рассматривалась: на ночи 1 значения `network` не было. Код применяет B1 шире, чем оно было принято, — к любому `hangup.by`, кроме бота. При этом на ночи 1 B1 не сработал ни разу: все 456 звонков `ADDRESS_NOT_UNDERSTOOD` закончил бот. Значит, B1 до сих пор не проверялся на реальных данных, и первый случай, где он срабатывает, — обрывы связи.
+4. **B1 was written for the caller, not the network.** B1 says explicitly that the **caller** hung up. The network was not considered: night 1 had no `network` value. The code applied B1 more broadly than it was decided, to any `hangup.by` except the bot. And B1 never fired on night 1: the bot ended all 456 `ADDRESS_NOT_UNDERSTOOD` calls. So B1 had never been tested on real data, and the first case where it fired was network drops.
 
-5. **Неверный владелец исправления.** В отчёте клиенту `ADDRESS_NOT_UNDERSTOOD` попадает в «бот или резолвер не понял адрес», то есть в работу нашей продуктовой команды. Но причина здесь — сеть. Даже идеальный резолвер не спас бы звонок, который оборвался во время повтора. Эти 75 звонков раздувают долю адресных ошибок на ночи 2 с 240 до 315 (+31 %).
+5. **Wrong owner of the fix.** In the client report `ADDRESS_NOT_UNDERSTOOD` counts as "the bot or the resolver did not understand the address", which is work for our product team. But the cause here is the network. Even a perfect resolver would not have saved a call that dropped during the retry. These 75 calls inflated the address failures on night 2 from 240 to 315 (+31 %).
 
-## Довод за текущий лейбл
+## The case for the old label
 
-- В README `ENDED_EARLY` описан как ранний конец звонка без сбоя инструмента, а `no_match` формально сбой инструмента. Если читать определение буквально, текущий лейбл допустим.
-- B1 ты принял в раунде 1 (`contested_cases.md`, строка «B1, B3–B6, B9–B11 ✅»). Предложение ниже — не отмена B1, а уточнение: он не должен распространяться на обрыв связи.
+- The README describes `ENDED_EARLY` as a call that ended early without a tool failure, and `no_match` is formally a tool failure. Read literally, the old label was defensible.
+- You accepted B1 in round 1 (`contested_cases.md`, the row "B1, B3–B6, B9–B11 ✅"). The proposal below does not revoke B1; it narrows it so that it does not extend to a dropped connection.
 
-Эталона для ночи 2 нет, поэтому окончательно рассудит только лидерборд. Аргументы 1–5 опираются на исход для звонящего, а не на промежуточный статус. Это главный принцип задания: решает исход для звонящего, а не промежуточные сбои.
+There is no ground truth for night 2, so only the leaderboard can settle it. Arguments 1–5 rest on the outcome for the caller, not on an intermediate status. That is the main principle of the assignment: the outcome for the caller decides, not intermediate failures.
 
-## Независимая проверка
+## Independent check
 
-Аудитор-сабагент (Opus, effort high) написал свой разметчик с нуля. Он совпал с `predictions_night1.csv` на всех 11 400 звонках ночи 1, а на ночи 2 разошёлся ровно в этих 75 звонках. Его вердикт: `ENDED_EARLY`, уверенность средняя. Оговорка: моё утверждение было в его задании, поэтому по этому пункту его проверка не полностью независима.
+An auditor subagent (Opus, effort high) wrote its own labeller from scratch. It matched `predictions_night1.csv` on all 11,400 night-1 calls and differed on night 2 in exactly these 75 calls. Its verdict: `ENDED_EARLY`, medium confidence. Caveat: my claim was in its brief, so on this point its check is not fully independent.
 
-## Что изменится, если принять
+## What changes if accepted
 
-| Лейбл | Сейчас | После |
+| Label | Before | After |
 |---|---:|---:|
 | `ADDRESS_NOT_UNDERSTOOD` | 315 | 240 |
 | `ENDED_EARLY` | 205 | 280 |
 
-Ночь 1 не меняется: там нет обрывов связи, и B1 не срабатывал.
+Night 1 does not change: it has no network drops, and B1 never fired there.
 
-Время суток: обрывы распределены по всей ночи, это 2,8–5,1 % звонков в каждом часе. Отдельного окна сбоя телефонии, как окно деградации OMS на ночи 1, в данных нет.
+Time of day: the drops are spread over the whole night, 2.8–5.1 % of calls in each hour. The data shows no separate telephony outage window like the OMS degradation window on night 1.
 
-## Предлагаемое исправление (не применено)
+## Proposed fix (not applied)
 
-В §4.3 одной неудачной попытки достаточно для `ADDRESS_NOT_UNDERSTOOD`, только если звонок закончил бот/`system` или положил трубку **звонящий** (B1 в исходной формулировке). Любое другое значение `hangup.by` (`network` и будущие неизвестные) при одной попытке без отказа бота → `ENDED_EARLY`. Правила «≥ 2 попыток» и «бот сдался» не меняются.
+In §4.3 a single failed attempt is enough for `ADDRESS_NOT_UNDERSTOOD` only if the bot/`system` ended the call or the **caller** hung up (B1 as worded). Any other `hangup.by` value (`network` and future unknown ones) with one attempt and no bot give-up → `ENDED_EARLY`. The "≥ 2 attempts" and "the bot gave up" rules stay.
 
-Чтобы сеть не подставлять в код по имени, список «кто может уйти сам» задаётся как `{caller}`, а всё вне `{caller, bot, system}` считается внешним обрывом. Нужно также дописать тест на B1 + `network` и запись в историю изменений спецификации.
+To avoid naming the network in the code, the set "who can leave on their own" is `{caller}`, and anything outside `{caller, bot, system}` counts as an external drop. A test for B1 + `network` and an entry in the specification change log are also needed.
 
-## Решение (26.11.2026)
+## Decision (26. 11. 2026)
 
-Ты решил шире, чем я предлагал: **обрыв связи до какого-либо исхода — всегда `ENDED_EARLY`**. Число попыток и прежние сбои инструментов роли не играют: это разрыв соединения, и закончили звонок не звонящий и не бот. Моё предложение выше с условием «одна попытка» поэтому не применялось.
+You decided more broadly than I proposed: **a network drop before any outcome is always `ENDED_EARLY`**. The number of attempts and earlier tool failures do not matter: it is a dropped connection, and neither the caller nor the bot ended the call. My proposal above with the "one attempt" condition was therefore not applied.
 
-Что сделано (решение N1, спецификация ред. 7):
-- [classify.py](../classify.py): если `hangup.by = network` и до обрыва не было исхода → `ENDED_EARLY`. Это касается адресной ветки и сбоев `get_outage`/`create_ticket`. Исход, полученный до обрыва (перевод, тикет, сообщённый статус, `route`), сохраняет свой лейбл.
-- Тесты: 8 новых случаев `N1` в `tests/test_classify.py`, всего 91, все проходят. Размеченная выборка — 60/60.
-- Ночь 1 побайтно совпадает с `predictions_night1.csv`: значения `network` там нет.
-- Ночь 2: изменились ровно эти 75 звонков. Теперь `ADDRESS_NOT_UNDERSTOOD` 240, `ENDED_EARLY` 280. [noc2/predictions_night2.csv](../noc2/predictions_night2.csv) перегенерирован.
+What was done (decision N1, specification ed. 7):
+- [classify.py](../classify.py): if `hangup.by = network` and there was no outcome before the drop → `ENDED_EARLY`. This covers the address branch and `get_outage`/`create_ticket` failures. An outcome reached before the drop (transfer, ticket, reported status, `route`) keeps its label.
+- Tests: 8 new `N1` cases in `tests/test_classify.py`, 91 in total, all pass. Labeled sample: 60/60.
+- Night 1 matches `predictions_night1.csv` byte for byte: it has no `network` value.
+- Night 2: exactly these 75 calls changed. Now `ADDRESS_NOT_UNDERSTOOD` 240, `ENDED_EARLY` 280. `noc2/predictions_night2.csv` (not committed) was regenerated.
 
-Текст выше оставлен без изменений как история рассуждения. Где там написано «сейчас `ADDRESS_NOT_UNDERSTOOD`», имеется в виду состояние до решения.
+The text above is kept unchanged as the record of the reasoning. Where it says "before N1" or describes the old label, it means the state before the decision.
