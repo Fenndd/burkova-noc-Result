@@ -7,7 +7,7 @@ Usage:
 Output: CSV `call_id,label`, one row per non-empty input line, in input order
 (stdout when --out is omitted). Diagnostics and the label summary go to stderr.
 
-Implements docs/spec_task1_eval.md (edition 5); comments cite spec sections and
+Implements docs/spec_task1_eval.md (edition 7); comments cite spec sections and
 decision ids (A*, B*, R*, S04) from docs/contested_cases.md.
 Only structured events are used; bot text is never matched (only "the bot spoke").
 Standard library only, Python 3.8+.
@@ -29,6 +29,7 @@ FALLBACK = "KNOWN_OUTAGE_INFORMED"  # 5.2 item 6 (only for unrecoverable data)
 KNOWN_TOOLS = ("resolve_address", "get_outage", "create_ticket")
 SCENARIO_KINDS = ("bot", "tool_call", "tool_result", "transfer", "route", "hangup")
 BOT_ENDED = ("bot", "system")  # R5 / B13
+NETWORK_ENDED = ("network",)  # N1: the connection dropped; neither the caller nor the bot ended the call
 SORT_RANK = {"tool_call": 0, "tool_result": 1, "transfer": 1}  # 5.2 item 3 tie-break (unsorted input only)
 
 # Values seen on night 1; anything else is reported in the stderr summary (6, 4d).
@@ -299,6 +300,11 @@ def classify_events(evs):
             episodes.append((i, "OUT_OF_SCOPE"))  # B10 (any target), R6
     if episodes:
         return max(episodes, key=lambda x: x[0])[1]
+
+    # N1: the network cut the call before any outcome -> ENDED_EARLY, whatever failed before
+    # (number of address attempts, a pending/failed tool). A drop is not the bot's outcome.
+    if ended_by in NETWORK_ENDED:
+        return "ENDED_EARLY"
 
     # 4.3 step 3: no episode -> the last unfixed failure (the furthest stage) decides.
     tickets = [a for a in attempts if a["name"] == "create_ticket"]
