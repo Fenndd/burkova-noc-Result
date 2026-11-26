@@ -408,3 +408,16 @@ Specification — rev. 6.
 ## Note on the repository (appended)
 
 `labeled_sample.md` and `calls_address_rejected.md` referenced above are full call transcripts, so they are not committed; regenerate them with `scripts/render_labeled.py` and `scripts/render_calls.py`.
+
+---
+---
+
+# Round 7 — night 2 run: calls cut by the network (26. 11. 2026)
+
+Night 2 (flow v15, 4,000 calls) brought a new value `hangup.by = network` (150 calls). 75 of them were cut right after the first `no_match`, while the bot was asking to repeat the address; under B1 / §4.3 they got `ADDRESS_NOT_UNDERSTOOD`. Analysis and the calls: [night2_network_drop.md](night2_network_drop.md).
+
+| # | Finding / question | Decision |
+|---|---|---|
+| N1 | A network drop after a failed address attempt gave `ADDRESS_NOT_UNDERSTOOD` (B1 was worded for the caller, the code applied it to any `hangup.by` except the bot) | ✅ **`ENDED_EARLY` in any case** (your decision): it is a dropped connection, not the caller's or the bot's outcome, so the number of attempts and earlier failures do not matter. An outcome reached before the drop (steps 1–2) keeps its label |
+
+Specification — rev. 7. Night 2: 75 calls `ADDRESS_NOT_UNDERSTOOD` → `ENDED_EARLY`; night 1 unchanged.

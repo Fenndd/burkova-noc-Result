@@ -139,6 +139,43 @@ class TestB(Base):
         self.check("ADDRESS_NOT_UNDERSTOOD", [GREET, caller(7), call(7.5, "resolve_address", text="x"),
                                               hang(8, "caller")])
 
+    # N1: a network drop before any outcome is ENDED_EARLY, whatever failed before
+    def test_N1_network_after_single_no_match(self):
+        self.check("ENDED_EARLY", [GREET] + failed_resolve(7) + [hang(15, "network")])
+
+    def test_N1_network_after_several_failed_attempts(self):
+        self.check("ENDED_EARLY", [GREET] + failed_resolve(7) + failed_resolve(12, "ambiguous")
+                   + [hang(20, "network")])
+
+    def test_N1_network_after_resolved_address(self):
+        self.check("ENDED_EARLY", [GREET, caller(7), call(7.5, "resolve_address", text="x"),
+                                   res(7.9, "resolve_address", "ok", RES_OK), bot(7.9, "Sedi to?"),
+                                   caller(11, "hej"), hang(11.5, "network")])
+
+    def test_N1_network_while_waiting_for_get_outage(self):
+        self.check("ENDED_EARLY", ADDR + [hang(13, "network")])
+
+    def test_N1_network_after_failed_get_outage(self):
+        self.check("ENDED_EARLY", ADDR + [res(13, "get_outage", "error"), bot(13, "overujem"),
+                                          hang(16, "network")])
+
+    def test_N1_network_after_failed_ticket(self):
+        self.check("ENDED_EARLY", UNKNOWN + TICKET + [res(18, "create_ticket", "error"),
+                                                      hang(19, "network")])
+
+    def test_N1_outcome_before_drop_is_kept(self):
+        self.check("KNOWN_OUTAGE_INFORMED", ADDR + [res(13, "get_outage", "ok", KNOWN), bot(13, "Porucha"),
+                                                    hang(20, "network")])
+        self.check("TICKET_CREATED", UNKNOWN + TICKET + [res(18, "create_ticket", "ok", {"ticket_id": "T-1"}),
+                                                         bot(18, "Hotovo"), hang(20, "network")])
+        self.check("TRANSFER_FAILED", [GREET, caller(7), bot(8), xfer(30, "no_agents"), bot(30),
+                                       hang(33, "network")])
+        self.check("OUT_OF_SCOPE", [GREET, caller(7, "faktura"), bot(9), route(9.5), hang(14, "network")])
+
+    def test_N1_caller_hangup_rules_unchanged(self):
+        self.check("ADDRESS_NOT_UNDERSTOOD", [GREET] + failed_resolve(7) + [hang(15, "caller")])
+        self.check("API_ERROR", ADDR + [hang(13, "caller")])
+
     def test_B1_many_attempts_not_hardcoded(self):
         ev = [GREET]
         for k in range(5):

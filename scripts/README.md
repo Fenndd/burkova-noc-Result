@@ -22,6 +22,7 @@ These scripts read `predictions_night1.csv`, the output of `classify.py`, and cr
 | `verify_bot_ended.py` | Independent check that `calls.csv` `ended_by == bot` matches the transcripts (the basis of "38 % = who ended the call"). |
 | `render_labeled.py [input] [--out]` | Writes the readable `docs/labeled_sample.md` (git-ignored). |
 | `render_calls.py <transcripts> --filter address_rejected --out <md>` | Writes a readable subset of calls, e.g. `docs/calls_address_rejected.md` (git-ignored). |
+| `night2_network_drops.py [transcripts] [calls.csv] [--out]` | Night 2: every number in [`docs/night2_network_drop.md`](../docs/night2_network_drop.md) (calls cut by `hangup.by = network`, decision N1) and the readable dump `docs/calls_network_drop_night2.md` (git-ignored). |
 
 ## Tests
 
@@ -29,4 +30,4 @@ These scripts read `predictions_night1.csv`, the output of `classify.py`, and cr
 python -m unittest discover -s tests
 ```
 
-`tests/test_classify.py` has 83 cases. The synthetic calls are named after the decision ids in `docs/contested_cases.md` (A1, B14, …). The spec they test is [`docs/spec_task1_eval.md`](../docs/spec_task1_eval.md).
+`tests/test_classify.py` has 91 cases. The synthetic calls are named after the decision ids in `docs/contested_cases.md` (A1, B14, …). The spec they test is [`docs/spec_task1_eval.md`](../docs/spec_task1_eval.md).

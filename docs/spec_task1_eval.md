@@ -77,6 +77,8 @@ If there is at least one episode → label = **the last episode before the end o
 ### 4.3. Step 3 — no episode: the last uncorrected failure decides
 The flow is sequential, so the last failure is also "the furthest stage".
 
+**Before the table (N1):** if the call was cut by the network (`hangup.by = network`) → `ENDED_EARLY`, whatever failed before: any number of failed address attempts, a pending or failed `get_outage`/`create_ticket`. The connection dropped; neither the caller nor the bot ended the call, so no failure is the outcome. Steps 1–2 still come first: an outcome reached before the drop (transfer, ticket, reported status, `route`) keeps its label.
+
 | Failure | Label |
 |---|---|
 | `create_ticket` failed or there is no result (B4) | `API_ERROR` |
@@ -91,7 +93,8 @@ This includes:
 - the `get_outage` ok arrived **after** the end of the call (A1);
 - the outage is unknown, but the caller left before `create_ticket` (B2);
 - the address was found on the first attempt, but the caller left without confirming it;
-- the caller hung up without waiting to be connected to the dispatcher, and no `transfer` is recorded before the end of the call (R7). If a ticket had been created before that — `TICKET_CREATED` per step 2.
+- the caller hung up without waiting to be connected to the dispatcher, and no `transfer` is recorded before the end of the call (R7). If a ticket had been created before that — `TICKET_CREATED` per step 2;
+- the network cut the call before any outcome (N1), see 4.3.
 
 ## 5. Robustness for "night 2"
 
@@ -201,5 +204,10 @@ These numbers are for cross-checking; the final ones will come from `classify.py
 - §4.0, §4.2: a `create_ticket` call after the caller left with a successful result → `TICKET_CREATED`.
 - §4.0: sorting with the event rank — only for unordered input.
 - §5.2: an event without `type` with only `text` → `bot`.
-- Implementation fixes without a change of rules: R6 checks the furthest stage first (`create_ticket` before `get_outage`); the input is opened before `--out` is written; a lone `` inside a line does not split it; `call_id` from a broken line is decoded; `false` is not treated as a non-empty identifier.
+- Implementation fixes without a change of rules: R6 checks the furthest stage first (`create_ticket` before `get_outage`); the input is opened before `--out` is written; a lone `
+` inside a line does not split it; `call_id` from a broken line is decoded; `false` is not treated as a non-empty identifier.
 - Night 2 risks from the code review (synonyms of success, a time shift by milliseconds, renamings) are deliberately not taken into account.
+
+**Ed. 7 (26. 11. 2026), after the night 2 run ([night2_network_drop.md](night2_network_drop.md), round 7 in [contested_cases.md](contested_cases.md)):**
+- §4.3, §4.4: N1 — `hangup.by = network` before any outcome → `ENDED_EARLY`, regardless of the number of attempts and of earlier tool failures. Steps 1–2 are unchanged. B1 now applies only when the **caller** hung up, as it was worded.
+- Night 2: 75 calls change `ADDRESS_NOT_UNDERSTOOD` → `ENDED_EARLY`. Night 1 has no `network` value: its 11,400 labels do not change.
